@@ -23,69 +23,119 @@
 import UIKit
 
 class ViewController: UIViewController {
-
-  var iconSets = [IconSet]()
-  @IBOutlet weak var tableView: UITableView!
-
-  override func viewDidLoad() {
-    super.viewDidLoad()
     
-    iconSets = IconSet.iconSets()
-    navigationItem.rightBarButtonItem = editButtonItem()
-    automaticallyAdjustsScrollViewInsets = false
-  }
-
-  override func didReceiveMemoryWarning() {
-    super.didReceiveMemoryWarning()
-    // Dispose of any resources that can be recreated.
-  }
+    var iconSets = [IconSet]()
+    @IBOutlet weak var tableView: UITableView!
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        iconSets = IconSet.iconSets()
+        navigationItem.rightBarButtonItem = editButtonItem()
+        automaticallyAdjustsScrollViewInsets = false
+        tableView.allowsSelectionDuringEditing = true
+    }
+    
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
+    }
 }
 
-extension ViewController : UITableViewDataSource {
-  
-  override func setEditing(editing: Bool, animated: Bool) {
-    super.setEditing(editing, animated: animated)
-    if editing {
-      tableView.setEditing(true, animated: true)
-    } else {
-      tableView.setEditing(false, animated: true)
-    }
-  }
-  
-  func numberOfSectionsInTableView(tableView: UITableView) -> Int {
-    return iconSets.count
-  }
-  
-  func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-    return iconSets[section].icons.count
-  }
-  
-  func tableView(tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-    return iconSets[section].name
-  }
-  
-  func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-    let cell = tableView.dequeueReusableCellWithIdentifier("IconCell", forIndexPath: indexPath)
-    let set = iconSets[indexPath.section]
-    let icon = set.icons[indexPath.row]
+extension ViewController : UITableViewDataSource, UITableViewDelegate {
     
-    cell.textLabel?.text = icon.title
-    cell.detailTextLabel?.text = icon.subtitle
+    override func setEditing(editing: Bool, animated: Bool) {
+        super.setEditing(editing, animated: animated)
+        if editing {
+            tableView.beginUpdates()
+            for (index, set) in iconSets.enumerate() {
+                let indexPath = NSIndexPath(forRow: set.icons.count, inSection: index)
+                tableView.insertRowsAtIndexPaths([indexPath], withRowAnimation: .Automatic)
+            }
+            tableView.endUpdates()
+            tableView.setEditing(true, animated: true)
+        } else {
+            tableView.beginUpdates()
+            for (index, set) in iconSets.enumerate() {
+                let indexPath = NSIndexPath(forRow: set.icons.count, inSection: index)
+                tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation: .Automatic)
+            }
+            tableView.endUpdates()
+            tableView.setEditing(false, animated: true)
+        }
+    }
     
-    if let imageView = cell.imageView, iconImage = icon.image {
-      imageView.image = iconImage
+    func numberOfSectionsInTableView(tableView: UITableView) -> Int {
+        return iconSets.count
     }
-
-    return cell
-  }
-  
-  func tableView(tableView: UITableView, commitEditingStyle editingStyle: UITableViewCellEditingStyle, forRowAtIndexPath indexPath: NSIndexPath) {
-    if editingStyle == .Delete {
-      let set = iconSets[indexPath.section]
-      set.icons.removeAtIndex(indexPath.row)
-      tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation:.Automatic)
-      
+    
+    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        let adjastment = editing ? 1 : 0
+        return iconSets[section].icons.count + adjastment
     }
-  }
-  
+    
+    func tableView(tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return iconSets[section].name
+    }
+    
+    func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCellWithIdentifier("IconCell", forIndexPath: indexPath)
+        let set = iconSets[indexPath.section]
+        if indexPath.row >= set.icons.count && editing {
+            cell.textLabel?.text = "Add Icon"
+            cell.detailTextLabel?.text = nil
+            cell.imageView?.image = nil
+        } else {
+            let icon = set.icons[indexPath.row]
+            
+            cell.textLabel?.text = icon.title
+            cell.detailTextLabel?.text = icon.subtitle
+            
+            if let imageView = cell.imageView, iconImage = icon.image {
+                imageView.image = iconImage
+            } else {
+                cell.imageView?.image = nil
+            }
+        }
+        
+        return cell
+    }
+    
+    func tableView(tableView: UITableView, commitEditingStyle editingStyle: UITableViewCellEditingStyle, forRowAtIndexPath indexPath: NSIndexPath) {
+        if editingStyle == .Delete {
+            let set = iconSets[indexPath.section]
+            set.icons.removeAtIndex(indexPath.row)
+            tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation:.Automatic)
+            
+        } else if editingStyle == .Insert {
+            let newIcon = Icon(withTitle: "New Icon", subtitle: "", imageName: nil)
+            let set = iconSets[indexPath.section]
+            set.icons.append(newIcon)
+            tableView.insertRowsAtIndexPaths([indexPath], withRowAnimation: .Automatic)
+        }
+    }
+    
+    func tableView(tableView: UITableView, editingStyleForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCellEditingStyle {
+        let set = iconSets[indexPath.section]
+        if indexPath.row >= set.icons.count {
+            return .Insert
+        }
+        return .Delete
+    }
+    
+    func tableView(tableView: UITableView, willSelectRowAtIndexPath indexPath: NSIndexPath) -> NSIndexPath? {
+        let set = iconSets[indexPath.section]
+        if editing && indexPath.row < set.icons.count {
+            return nil
+        }
+        return indexPath
+    }
+    
+    func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
+        tableView.deselectRowAtIndexPath(indexPath, animated: true)
+        let set = iconSets[indexPath.section]
+        if indexPath.row >= set.icons.count && editing {
+            self.tableView(tableView, commitEditingStyle: .Insert, forRowAtIndexPath: indexPath)
+        }
+    }
 }
